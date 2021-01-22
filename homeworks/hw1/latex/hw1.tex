@@ -1,0 +1,50 @@
+\documentclass{../../psv}
+\def\TaskNo{1}
+\usepackage{../../imports}
+
+\begin{document}
+  To recap, we are given a ``base'' $\State_0$, with an evaluator $\eval{\cdot}_0: Instr_0 \to (\State_0 \pfun \State_0)$, which contains every part of the described syntax and big-step semantics except for the transaction mechanism. Our goal is to construct $\State$ and corresponding $\eval{\cdot}: Instr \to (\State \pfun \State)$.
+
+  \paragraph{Modifying the state} First of all, we can assume that $\State_0 = \hs{Memory}_0 =: \hs{Memory}$, since in the base language, only ``stateful'' feature is variable assigment (\hs{while} loop isn't breakable), and nothing about it is modified in our extension of the language; we shall assume the isomorphisms to be implicitly there in the definitions. The new features are the following:
+  \begin{enumerate}
+    \item We need an indicator for whether \hs{fail} has been successfully invoked (and, if so, about which particular \hs{try}-block);
+    \item We need to create the snapshot of $\hs{Memory}$ to revert to if a transaction needs to be rescinded (or save to if \hs{commit} is invoked); there is, however, some subtlety involved, as (from what I understand), saving the state at the beginning of a \hs{try}-block is different from \hs{commit}ing.
+    \item We also need to maintain some memory of the enveloping \hs{try}-blocks (so as to ignore \hs{fail} if the referenced transaction is not enveloping)
+  \end{enumerate}
+  The following should therefore suffice:
+  \begin{align*}
+    \hs{State} &:= (\hs{Memory}, TrId?, TrId \pfun \hs{Memory}, \hslist{TrId})\\
+    \ell(m) &= (m, \bot, \varnothing, []): \hs{Memory}_0 \to \hs{Memory}
+  \end{align*}
+  These represent, respectively, base state, (optional) failed transaction indicator, memory snapshots' \emph{map} and a list/stack of enveloping \hs{try}-blocks; we also attach a state lifting function.
+
+  \paragraph{Semantics} ``Mathematically'':
+  \begin{align*}
+    \hs{[OnFail]}\hspace{1em} & \frac{f \not= \bot, I \in \set{\hs{try}\ t: I, \hs{fail}\ t, \hs{commit}}}{\eval{I}\ (m, f, \mu_s, T) = (m, f, \mu_s, T)}\\
+    \hs{[Try]}\hspace{1em} & \frac{\eval{I}\ (m, \bot, \mu_s[t \gets m], [t, *T]) = (m', t', \mu_s', [t, *T])}{\eval{\hs{try}\ t: I}\ (m, \bot, \mu_s, T) = \begin{cases}
+      (\mu_s'(t), \bot, \mu_s', T), & t = t'\\
+      (m', t', \mu_s', T), & t \not= t'
+    \end{cases}}\\
+    \hs{[Fail]}\hspace{1em} &\eval{\hs{fail}\ t}\ (m, \bot, \mu_s, T) = \begin{cases}
+      (m, t, \mu_s, T), & t \in T\\
+      (m, \bot, \mu_s, T), & t \not\in T
+    \end{cases}\\
+    \hs{[Commit]}\hspace{1em} &\eval{\hs{commit}}\ (m, \bot, \mu_s, T) = (m, \bot, \lambda {t \in T}. m, T)\\
+    \hs{[Seq]}\hspace{1em} &\eval{I_1; I_2} = \eval{I_2} \circ \eval{I_1}\\
+    \hs{[Lift]}\hspace{1em} &\frac{\eval{I}_0\ m = m'}{\eval{I}\ (m, t, \mu_s, T) = \begin{cases}
+      (m, t, \mu_s, T), & t = \bot\\
+      (m', t, \mu_s, T), & t \not= \bot
+    \end{cases}}
+  \end{align*}
+  In the natural language:
+  \begin{enumerate}
+    \item[\hs{[OnFail]}] If we are in ``failed'' state, it can only be reverted ``higher-up'' (in \hs{[Try]}), and all the other instructions should be skipped. Here we handle the new instructions; the original ones are handled in \hs{Lift};
+    \item[\hs{[Try]}] For $\hs{try}\ t: I$, we evaluate $I$ with $t$ added to the stack (and memory snapshot for $t$ saved), and if $\hs{fail}\ t$ has not been handled up to this point, we revert the memory to the snapshot associated with the flag and clear the flag; in any case, we pop $t$ from the stack;
+    \item[\hs{[Fail]}] For $\hs{fail}\ t$, if a transaction named $t$ indeed envelops the operation, we raise the failure flag; otherwise, the operation is supposed to do nothing;
+    \item[\hs{[Commit]}] For $\hs{commit}$, we assign to every current transaction a snapshot of current memory.
+    \item[\hs{[Seq]}] No modification should be required in the implementation of the semicolon;
+    \item[\hs{[Lift]}] We lift all the operations in the original language, according to the \hs{fail} semantics.
+  \end{enumerate}
+
+  \paragraph{Implementation} I have created a simple implementation of an interpreter of the language. The relevant code and README.md is in \url{https://github.com/vitreusx/sem1/tree/master/hs}.
+\end{document}

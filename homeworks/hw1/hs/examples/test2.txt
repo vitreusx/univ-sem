@@ -1,0 +1,7 @@
+x := 0
+try t:
+  x := 1
+  try u:
+    x := 2
+    commit
+    fail t

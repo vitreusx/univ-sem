@@ -1,0 +1,30 @@
+name:                sem1
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/vitreusx/sem1
+license:             BSD3
+author:              vitreusx
+maintainer:          Vitreus101@protonmail.com
+copyright:           2020 vitreusx
+category:            Web
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+  - parsec
+  - lens
+  - indents
+  - mtl
+  - text
+  - transformers
+
+executables:
+  sem1:
+    source-dirs:      src
+    main:             Main.hs
+
+ghc-options:
+  - "-fexternal-interpreter"

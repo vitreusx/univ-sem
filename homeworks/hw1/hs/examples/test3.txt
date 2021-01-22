@@ -1,0 +1,5 @@
+x := 0
+try t:
+  x := 1
+  try t:
+    fail t

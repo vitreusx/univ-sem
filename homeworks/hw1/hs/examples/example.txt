@@ -1,0 +1,9 @@
+x := 0; y := 0; z := 10
+try t:
+  while true do
+    commit; x := x+1
+    try u:
+      while true do
+        y := y+1; z := z-1
+        if x<y then fail u
+        if z<x then fail t

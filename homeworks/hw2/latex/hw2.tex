@@ -1,0 +1,111 @@
+\documentclass{../../psv}
+\def\TaskNo{2}
+\usepackage{../../imports}
+
+\newcommand{\Num}{\mathbf{Num}}
+\newcommand{\Var}{\mathbf{Var}}
+\newcommand{\Expr}{\mathbf{Expr}}
+\newcommand{\Decl}{\mathbf{Decl}}
+\newcommand{\Stmt}{\mathbf{Stmt}}
+\newcommand{\Store}{\mathbf{Store}}
+\newcommand{\Setter}{\mathbf{Setter}}
+\newcommand{\Env}{\mathbf{Env}}
+\newcommand{\Loc}{\mathbf{Loc}}
+
+\newcommand{\Numeval}[1]{\mathcal{N}\eval{#1}}
+\newcommand{\Vareval}[1]{\mathcal{V}\eval{#1}}
+\newcommand{\Expreval}[1]{\mathcal{E}\eval{#1}}
+\newcommand{\Decleval}[1]{\mathcal{D}\eval{#1}}
+\newcommand{\Stmteval}[1]{\mathcal{S}\eval{#1}}
+
+\newcommand{\offset}{\hspace{1.4em}}
+
+\begin{document}
+  \paragraph{Semantic types} Let us start with the trivial types:
+  \begin{align*}
+    \domain{\Num} &= \mathbb{Z}\\
+    \domain{\Var} &= \Var \sqcup \set{\mathtt{var}}
+  \end{align*}
+  We introduce $\set{\mathtt{var}}$ into the semantic domain of variables (as a ``formal'' variable) in order to simplify certain operations. Now, we need to define environment and memory types:
+  \begin{align*}
+    \Store &= \Loc \pto \domain{\Num}\\
+    \Setter &= \domain{\Num} \pto (\Store \pto \Store)\\
+    \Env &= \domain{\Var} \pto \Loc \times \Setter
+  \end{align*}
+  where $\Setter$ is the type of the anonymous procedure in $\mathtt{var\ } x_1 \mathtt{\ set\ to\ } x_2 \mathtt{\ by\ } S$. The other types are standard:
+  \begin{align*}
+    \domain{\Expr} &= \Env \times \Store \pto \domain{\Num}\\
+    \domain{\Decl} &= \Env \times \Store \pto \Env \times \Store\\
+    \domain{\Stmt} &= \Env \times \Store \pto \Store
+  \end{align*}
+
+  \paragraph{Evaluation functions}  As for the evaluations, we have $\Numeval{\cdot}$, $\Vareval{\cdot}$, $\Expreval{\cdot}$, $\Decleval{\cdot}$ and $\Stmteval{\cdot}$ for $\Num$, $\Var$, $\Expr$, $\Decl$ and $\Stmt$ respectively. Let us now define them:
+  \begin{enumerate}
+    \item $\Numeval{\cdot}: \Num \to \domain{\Num}$:
+    \begin{align*}
+      \Numeval{n} &= n
+    \end{align*}
+
+    \item $\Vareval{\cdot}: \Var \to \domain{\Var}$:
+    \begin{align*}
+      \Vareval{x} &= x
+    \end{align*}
+    Given the nature of this evaluation, we will use it implicitly in the other definitions.
+
+    \item $\Expreval{\cdot}: \Expr \to \domain{\Expr}$:
+    \begin{align*}
+      \Expreval{n} (\rho, \mu) &= \Numeval{n}\\
+      \Expreval{x} (\rho, \mu) &= \mathtt{let\ } (\ell_x, \mathsf{set}_x) = \rho(\Vareval{x})\\
+      &\offset \mathtt{in\ } \mu(\ell_x)\\
+      \Expreval{e_1 \star e_2} (\rho, \mu) &= \Expreval{e_1} (\rho, \mu) \star \Expreval{e_2} (\rho, \mu), &\star \in \set{+, -, \ast}
+    \end{align*}
+
+    \item $\Decleval{\cdot}: \Decl \to \domain{\Decl}$:
+    \begin{align*}
+      \Decleval{\mathtt{var\ } x_1 \mathtt{\ set\ to\ } x_2 \mathtt{\ by\ } S} (\rho, \mu) &= \mathsf{newvar}(\Vareval{x_1}, \mathsf{setter}(\Vareval{x_1}, \Vareval{x_2}, S, \rho), 0) (\rho, \mu)\\
+      \Decleval{d_1; d_2} &= \Decleval{d_2} \circ \Decleval{d_1}\\
+      \Decleval{\epsilon} &= \mathsf{id}_{\Env \times \Store}
+    \end{align*}
+    Aside from $\mathsf{setter}$, whose implementation is more involved, we have introduced an auxiliary function:
+    \begin{align*}
+      \mathsf{newvar}(x, \mathsf{set}_x, \mathsf{init}_x)(\rho, \mu) &= \mathtt{let\ } \ell_x = \mathsf{alloc}(\mu)\\
+      &\offset \mathtt{in\ } (\rho[x \gets (\ell_x, \mathsf{set}_x)], \mu[\ell_x \gets \mathsf{init}_x])
+    \end{align*}
+    which introduces (or overwrites) a variable $x: \domain{\Var}$ with a given setter $\mathsf{set}_x: \Setter$ and an initial value $\mathsf{init}_x: \domain{\Num}$.
+
+    \item $\Stmteval{\cdot}: \Stmt \to \domain{\Stmt}$:
+    \begin{align*}
+      \Stmteval{x := e} &= \mathsf{proxyset}(\Vareval{x}, e)\\
+      \Stmteval{\mathtt{var\ } := e} &= \mathsf{proxyset}(\mathtt{var}, e)\\
+      \Stmteval{S_1; S_2} (\rho, \mu) &= \Stmteval{S_2}(\rho, \Stmteval{S_1}(\rho, \mu))\\
+      \Stmteval{\mathtt{if\ } e = 0 \mathtt{\ then\ } S_1 \mathtt{\ else\ } S_2} &= \langle default \rangle\\
+      \Stmteval{\mathtt{while\ } e \not= 0 \mathtt{\ do\ } S} &= \langle default \rangle\\
+      \Stmteval{\mathtt{begin\ } d; S \mathtt{\ end}} &= \Stmteval{S} \circ \Decleval{d}
+    \end{align*}
+    where:
+    \begin{align*}
+      \mathsf{proxyset}(x, e)(\rho, \mu) &= \mathtt{let\ } (\ell_x, \mathsf{set}_x) = \rho(x)\\
+      &\offset \mathtt{in\ } \mathsf{set}_x(\Expreval{e}(\rho, \mu))(\mu)\\
+    \end{align*}
+    is a ``variable'' (including $\mathtt{var}$) assignment using setter.
+  \end{enumerate}
+
+  \paragraph{Setter} All that is left is implementing $\mathsf{setter}$; this is the place where adding $\mathtt{var}$ to $\domain{\Var}$ will pay off. Given the recursive nature of the procedure, we will want to implement first a version of the procedure which ``takes itself''. Mathematically, we have:
+  \begin{align*}
+    \mathsf{setter}_0(x_1, x_2, S, \rho)(\mathsf{recur})(\mu)(n) &= \Stmteval{S}(\rho_3, \mu_3)\\
+    \mathsf{newvar}(x_1, \mathsf{recur}, 0)(\rho_2, \mu_2) &= (\rho_3, \mu_3)\\
+    \mathsf{newvar}(x_2, \mathsf{truesetter}(\rho_1, \Vareval{x_2}), n) &= (\rho_2, \mu_2)\\
+    \mathsf{newvar}(\mathtt{var}, \mathsf{truesetter}(\rho, \Vareval{x_1}), 0)(\rho, \mu) &= (\rho_2, \mu_2)
+  \end{align*}
+  In words, $\mathsf{setter}_0(x_1, x_2, S, \rho): \Setter \pto \Setter$ is the ``recurrent'' version, in which we:
+  \begin{itemize}
+    \item set $\mathtt{var}$ pseudovariable to set $x_1$ directly, and assigns $0$ to it (though it's inaccessible);
+    \item set $x_2$ to direct write, and assigns $n$ to it (this is the formal parameter of the anonymous procedure);
+    \item set $x_1$ to recur, and also assigns it the value $0$;
+    \item execute $S$ in this new state/environment, creating new state.
+  \end{itemize}
+  With that, we can write:
+  \begin{align*}
+    \mathsf{setter}(x_1, x_2, S, \rho) &= \mathsf{fix}(\mathsf{setter}_0(x_1, x_2, S, \rho))
+  \end{align*}
+\end{document}
