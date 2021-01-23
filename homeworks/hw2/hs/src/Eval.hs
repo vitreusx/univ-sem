@@ -2,10 +2,10 @@ module Eval where
 
 import           AST
 import           Prelude                 hiding ( Num )
-import           Data.Map                hiding ( foldl
-                                                , map
-                                                )
+import           Data.Map
+import qualified Prelude                       as Pre
 import qualified Data.Map                      as Map
+import qualified Data.List                     as List
 
 -- Let's start with the types
 
@@ -27,8 +27,12 @@ data Var = Var String | MetaVar
 -- but I wanted to see how much more difficult it would be.
 
 -- Due to the static scope requirement, we use locations in
--- the environment
-type Loc = Integer
+-- the environment.
+
+-- Note: type Loc = Integer is also fine, but it's hard to
+-- know what is what in final Store returned by running the
+-- statement, so I decided to attach variable name to it.
+type Loc = (String, Integer)
 type Env = Map Var Loc
 
 type Setter = Num -> Store -> Store
@@ -39,9 +43,30 @@ type Setter = Num -> Store -> Store
 -- anyways, and we can now define a custom Show
 newtype Store = Store (Map Loc (Num, Setter))
 
+-- Pretty printing the memory
 instance Show Store where
-  showsPrec prec (Store mu) =
-    let mu_redux = Map.map fst mu in showsPrec prec mu_redux
+  show mu =
+    let var_to_lv = reorderStore mu
+    in  let varLines = concat (Map.mapWithKey showVar var_to_lv)
+        in  List.intercalate "\n" varLines
+
+-- This helper transforms Store :: (String, Integer) \pto (Num, Setter)
+-- into String \pto [(Integer, Num)]
+reorderStore :: Store -> Map String [(Integer, Num)]
+reorderStore (Store mu) =
+  let loc_to_val_assocs = Map.assocs (Map.map fst mu)
+  in  let reorder ((var, ord), val) = (var, [(ord, val)])
+      in  let var_to_lv_assocs = Pre.map reorder loc_to_val_assocs
+          in  Map.fromListWith (++) var_to_lv_assocs
+
+-- This helper returns pretty-printed lines for one variable,
+-- which are intercalated later on
+showVar :: String -> [(Integer, Num)] -> [String]
+showVar name lvs =
+  let showLoc (loc, val) = "  " ++ (show loc) ++ " -> " ++ (show val)
+  in  case lvs of
+        [(_, val)] -> [name ++ ": " ++ (show val)]
+        xs         -> [name ++ ":"] ++ Pre.map showLoc xs
 
 valOf :: Loc -> Store -> Num
 valOf ell (Store mu) = fst (mu ! ell)
@@ -99,7 +124,7 @@ evalDecl ast = case ast of
         x_2' = evalVar x_2
         s'   = evalStmt s
     in  setterDecl x_1' x_2' s'
-  DeclSeq ds -> foldl (.) id (map evalDecl ds)
+  DeclSeq ds -> Pre.foldl (.) id (Pre.map evalDecl ds)
 
 -- Now for the creation of setter Decl. We need to create
 -- a recurrent version thereof, i.e. one that takes "itself"
@@ -107,7 +132,7 @@ evalDecl ast = case ast of
 -- 
 -- "var x_1 set to x_2 by S"
 -- -> introduces a new variable x_1 with the value of 0;
--- -> sets the setter of "var" to set x_1 (within S);
+-- -> sets the setter of "var" to set x_1 (within S)
 -- -> sets the setter of x_1 to S, where S n:
 --    -> introduces a variable x_2 (within S);
 --    -> sets the value of x_2 to n;
@@ -133,7 +158,7 @@ freeze rho_0 recur n mu = (recur n) (rho_0, mu)
 -- Create a new variable, with "default" settings
 newVar :: Var -> (Env, Store) -> (Env, Store, Loc)
 newVar x (rho, mux@(Store mu)) =
-  let ell_x = alloc mux
+  let ell_x = alloc x mux
   in  let init_x = 0
           set_x  = proxy ell_x
       in  let rho' = insert x ell_x rho
@@ -141,8 +166,20 @@ newVar x (rho, mux@(Store mu)) =
           in  (rho', mu', ell_x)
 
 -- Find a free location for a variable
-alloc :: Store -> Loc
-alloc (Store mu) = if Map.null mu then 0 else maximum (keys mu) + 1
+alloc :: Var -> Store -> Loc
+alloc x (Store mu) =
+  let name = varName x
+  in  let xlocs = Pre.filter (\loc -> fst loc == name) (keys mu)
+      in  ( name
+          , if Pre.null xlocs
+            then 0
+            else maximum (Pre.map snd xlocs) + 1
+          )
+
+varName :: Var -> String
+varName x = case x of
+  Var name -> name
+  MetaVar  -> "var"
 
 -- Create a setter which "just" sets the memory
 proxy :: Loc -> Setter
@@ -168,7 +205,7 @@ evalStmt :: AStmt -> Stmt
 evalStmt ast = case ast of
   SetReal x e  -> assign (evalVar x) (evalExpr e)
   SetMeta e    -> assign MetaVar (evalExpr e)
-  StmtSeq ss   -> stmtSeq (map evalStmt ss)
+  StmtSeq ss   -> stmtSeq (Pre.map evalStmt ss)
   If e s_t s_f -> ifStmt (evalExpr e) (evalStmt s_t) (evalStmt s_f)
   While e s    -> while (evalExpr e) (evalStmt s)
   Begin d s    -> begin (evalDecl d) (evalStmt s)
