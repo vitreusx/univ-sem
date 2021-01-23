@@ -4,38 +4,25 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           sem1
+name:           sem3
 version:        0.1.0.0
 category:       Web
-homepage:       https://github.com/githubuser/sem2#readme
-author:         vitreusx
-maintainer:     Vitreus101@protonmail.com
-copyright:      2020 vitreusx
+homepage:       https://github.com/githubuser/sem3#readme
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2021 Author name here
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
 
-executable sem1
+executable sem3
   main-is: Main.hs
   other-modules:
-      AST
-      Eval
-      Lexer
-      Parser
-      Trans
-      Paths_sem1
+      Paths_sem3
   hs-source-dirs:
       src
-  ghc-options: -fexternal-interpreter
   build-depends:
       base >=4.7 && <5
-    , containers
-    , indents
-    , lens
-    , mtl
-    , parsec
-    , text
-    , transformers
   default-language: Haskell2010

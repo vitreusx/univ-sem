@@ -1,0 +1,9 @@
+begin
+  var x set to y by
+    if y = 0 then
+      var := 1
+    else
+      x := y - 1
+      var := x * y
+  x := 5
+end

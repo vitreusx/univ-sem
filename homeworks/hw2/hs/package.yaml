@@ -1,4 +1,4 @@
-name:                sem1
+name:                sem2
 version:             0.1.0.0
 #synopsis:
 #description:
@@ -22,7 +22,7 @@ dependencies:
   - transformers
 
 executables:
-  sem1:
+  sem2:
     source-dirs:      src
     main:             Main.hs
 

@@ -1,0 +1,4 @@
+begin
+  var x set to y by var := 2 * y
+  x := 8
+end
